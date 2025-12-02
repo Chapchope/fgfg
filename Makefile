@@ -1,4 +1,6 @@
-# Makefile for Grid-Based FMM with Cartesian Multipole Expansion
+# Makefile for Grid-Based FMM 2D with modular architecture
+#
+# Version 2: Модульная архитектура с заменяемым потенциалом
 #
 # Supports:
 # - gfortran (GNU Fortran)
@@ -24,75 +26,78 @@ SRC_DIR = src
 BUILD_DIR = build
 BIN_DIR = bin
 
-# Source files (in dependency order)
-SOURCES = $(SRC_DIR)/types_mod.f90 \
-          $(SRC_DIR)/potential_interface_mod.f90 \
-          $(SRC_DIR)/cartesian_multipole_mod.f90 \
-          $(SRC_DIR)/grid_fmm_mod.f90 \
-          $(SRC_DIR)/md_utils_mod.f90 \
-          $(SRC_DIR)/test_grid_fmm.f90
-
-# Object files
-OBJECTS = $(patsubst $(SRC_DIR)/%.f90,$(BUILD_DIR)/%.o,$(SOURCES))
-
-# Module files
-MODULES = $(BUILD_DIR)/types_mod.mod \
-          $(BUILD_DIR)/potential_interface_mod.mod \
-          $(BUILD_DIR)/cartesian_multipole_mod.mod \
-          $(BUILD_DIR)/grid_fmm_mod.mod \
-          $(BUILD_DIR)/md_utils_mod.mod
-
-# Executable
-TARGET = $(BIN_DIR)/test_grid_fmm
+# Module flags
+MODFLAGS = -J$(BUILD_DIR)
 
 # Default target
-all: directories $(TARGET)
+all: directories test_fmm_v2
 
 # Create directories
 directories:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(BIN_DIR)
 
-# Link executable
-$(TARGET): $(OBJECTS)
-	@echo "Linking $@..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -o $@ $(OBJECTS)
-	@echo "Build complete: $@"
+#=============================================================================
+# NEW MODULAR ARCHITECTURE (v2)
+#=============================================================================
 
-# Compile object files
+# Object files for v2
+OBJS_V2 = $(BUILD_DIR)/types_mod.o \
+          $(BUILD_DIR)/potential_2d_mod.o \
+          $(BUILD_DIR)/multipole_2d_mod.o \
+          $(BUILD_DIR)/grid_fmm_2d_mod.o
+
+# Executable for v2
+test_fmm_v2: directories $(OBJS_V2)
+	@echo "Linking test_fmm_v2..."
+	$(FC) $(FFLAGS) $(MODFLAGS) -o $(BIN_DIR)/test_fmm_v2 $(OBJS_V2) $(SRC_DIR)/test_fmm_v2.f90
+	@echo "Build complete: $(BIN_DIR)/test_fmm_v2"
+
+# Compile rules for v2
+
 $(BUILD_DIR)/types_mod.o: $(SRC_DIR)/types_mod.f90
 	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+	$(FC) $(FFLAGS) $(MODFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/potential_interface_mod.o: $(SRC_DIR)/potential_interface_mod.f90 \
-                                        $(BUILD_DIR)/types_mod.o
+$(BUILD_DIR)/potential_2d_mod.o: $(SRC_DIR)/potential_2d_mod.f90 \
+                                  $(BUILD_DIR)/types_mod.o
 	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+	$(FC) $(FFLAGS) $(MODFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/cartesian_multipole_mod.o: $(SRC_DIR)/cartesian_multipole_mod.f90 \
-                                        $(BUILD_DIR)/types_mod.o
+$(BUILD_DIR)/multipole_2d_mod.o: $(SRC_DIR)/multipole_2d_mod.f90 \
+                                  $(BUILD_DIR)/types_mod.o \
+                                  $(BUILD_DIR)/potential_2d_mod.o
 	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+	$(FC) $(FFLAGS) $(MODFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/grid_fmm_mod.o: $(SRC_DIR)/grid_fmm_mod.f90 \
-                             $(BUILD_DIR)/types_mod.o \
-                             $(BUILD_DIR)/potential_interface_mod.o \
-                             $(BUILD_DIR)/cartesian_multipole_mod.o
+$(BUILD_DIR)/grid_fmm_2d_mod.o: $(SRC_DIR)/grid_fmm_2d_mod.f90 \
+                                 $(BUILD_DIR)/types_mod.o \
+                                 $(BUILD_DIR)/potential_2d_mod.o \
+                                 $(BUILD_DIR)/multipole_2d_mod.o
 	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+	$(FC) $(FFLAGS) $(MODFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/md_utils_mod.o: $(SRC_DIR)/md_utils_mod.f90 \
-                             $(BUILD_DIR)/types_mod.o
-	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+#=============================================================================
+# OLD TARGETS (for backward compatibility)
+#=============================================================================
 
-$(BUILD_DIR)/test_grid_fmm.o: $(SRC_DIR)/test_grid_fmm.f90 \
-                              $(BUILD_DIR)/types_mod.o \
-                              $(BUILD_DIR)/potential_interface_mod.o \
-                              $(BUILD_DIR)/grid_fmm_mod.o \
-                              $(BUILD_DIR)/md_utils_mod.o
+# Old simple FMM
+simple: directories $(BUILD_DIR)/types_mod.o $(BUILD_DIR)/simple_fmm_2d.o
+	@echo "Linking test_simple..."
+	$(FC) $(FFLAGS) $(MODFLAGS) -o $(BIN_DIR)/test_simple \
+		$(BUILD_DIR)/types_mod.o \
+		$(BUILD_DIR)/simple_fmm_2d.o \
+		$(SRC_DIR)/test_simple.f90
+	@echo "Build complete: $(BIN_DIR)/test_simple"
+
+$(BUILD_DIR)/simple_fmm_2d.o: $(SRC_DIR)/simple_fmm_2d.f90 \
+                               $(BUILD_DIR)/types_mod.o
 	@echo "Compiling $<..."
-	$(FC) $(FFLAGS) -J$(BUILD_DIR) -c $< -o $@
+	$(FC) $(FFLAGS) $(MODFLAGS) -c $< -o $@
+
+#=============================================================================
+# UTILITY TARGETS
+#=============================================================================
 
 # Debug build
 debug: FFLAGS = $(FFLAGS_DEBUG)
@@ -105,10 +110,31 @@ clean:
 	rm -f *.mod *.o *.csv
 	@echo "Clean complete."
 
-# Run test
-run: $(TARGET)
-	@echo "Running test..."
-	cd $(BIN_DIR) && ./test_grid_fmm
+# Run new test (v2)
+run: test_fmm_v2
+	@echo ""
+	@echo "============================================"
+	@echo "  Running Grid-based FMM 2D (v2)..."
+	@echo "============================================"
+	@echo ""
+	./$(BIN_DIR)/test_fmm_v2
+
+# Run old simple test
+run-simple: simple
+	@echo "Running simple FMM test..."
+	./$(BIN_DIR)/test_simple
+
+# Help
+help:
+	@echo "Available targets:"
+	@echo "  all          - Build test_fmm_v2 (new modular version)"
+	@echo "  test_fmm_v2  - Build new modular FMM"
+	@echo "  simple       - Build old simple FMM"
+	@echo "  run          - Build and run test_fmm_v2"
+	@echo "  run-simple   - Build and run simple test"
+	@echo "  debug        - Build with debug flags"
+	@echo "  clean        - Remove all build artifacts"
+	@echo "  help         - Show this help message"
 
 # Phony targets
-.PHONY: all directories debug clean run
+.PHONY: all directories test_fmm_v2 simple debug clean run run-simple help
