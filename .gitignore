@@ -1,0 +1,31 @@
+# Build artifacts
+build/
+bin/
+*.o
+*.mod
+
+# Output files
+*.csv
+*.dat
+*.txt
+*.png
+*.gif
+
+# Backup files
+*~
+*.bak
+*.swp
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
