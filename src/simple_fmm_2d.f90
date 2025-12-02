@@ -28,7 +28,7 @@ module simple_fmm_2d
   ! Параметры (можно менять)
   integer, parameter :: P_ORDER = 6  ! Порядок разложения
   integer, parameter :: NGRID = 30   ! Размер сетки
-  integer, parameter :: NEAR_RANGE = 3  ! Радиус ближнего поля (увеличен для точности!)
+  integer, parameter :: NEAR_RANGE = 7  ! Радиус ближнего поля (большой для компенсации неполного M2L!)
 
   type :: Cell
      real(dp) :: xc, yc              ! Центр ячейки
