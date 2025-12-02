@@ -28,7 +28,7 @@ module simple_fmm_2d
   ! Параметры (можно менять)
   integer, parameter :: P_ORDER = 6  ! Порядок разложения
   integer, parameter :: NGRID = 30   ! Размер сетки
-  integer, parameter :: NEAR_RANGE = 2  ! Радиус ближнего поля
+  integer, parameter :: NEAR_RANGE = 3  ! Радиус ближнего поля (увеличен для точности!)
 
   type :: Cell
      real(dp) :: xc, yc              ! Центр ячейки
@@ -195,7 +195,7 @@ contains
     real(dp), intent(in) :: xs(N), ys(N), qs(N)
     type(Cell), intent(inout) :: grid(:,:)
 
-    integer :: ix, iy, i, ip, n, m
+    integer :: ix, iy, i, ip, nn, mm
     real(dp) :: dx, dy, q
 
     do iy = 1, NGRID
@@ -315,7 +315,7 @@ contains
     real(dp), intent(in) :: dx, dy, R
     real(dp), intent(inout) :: L(0:P_ORDER, 0:P_ORDER)
 
-    integer :: n, m
+    integer :: nn, mm
     real(dp) :: R_inv, R2, R3, R5, R7
     real(dp) :: powers_x(0:P_ORDER), powers_y(0:P_ORDER)
 
@@ -329,22 +329,22 @@ contains
     powers_x(0) = 1.0_dp
     powers_y(0) = 1.0_dp
     do nn = 1, P_ORDER
-      powers_x(n) = powers_x(nn-1) * dx
-      powers_y(n) = powers_y(nn-1) * dy
+      powers_x(nn) = powers_x(nn-1) * dx
+      powers_y(nn) = powers_y(nn-1) * dy
     end do
 
-    ! Основные члены (monopole)
+    ! УПРОЩЕННАЯ M2L (хватит для демонстрации)
+    ! Вклад монополя
     L(0,0) = L(0,0) + M(0,0) * R_inv
 
-    ! Dipole
+    ! Вклад дипольных моментов
     if (P_ORDER >= 1) then
       L(0,0) = L(0,0) + (M(1,0)*dx + M(0,1)*dy) * R3
-
       L(1,0) = L(1,0) - M(0,0) * dx * R3 + M(1,0) * R_inv
       L(0,1) = L(0,1) - M(0,0) * dy * R3 + M(0,1) * R_inv
     end if
 
-    ! Quadrupole
+    ! Вклад квадрупольных моментов
     if (P_ORDER >= 2) then
       L(0,0) = L(0,0) + (M(2,0)*dx*dx + 2.0_dp*M(1,1)*dx*dy + M(0,2)*dy*dy) * R5
 
@@ -356,8 +356,8 @@ contains
       L(0,2) = L(0,2) + M(0,0) * (3.0_dp*dy*dy - R2) * R5 + M(0,2) * R_inv
     end if
 
-    ! Для высших порядков можно добавить больше членов
-    ! Но обычно до квадруполя достаточно
+    ! ДЛЯ ВЫСШЕЙ ТОЧНОСТИ: добавьте формулы для p=3,4,5,6
+    ! Сейчас используем только до p=2, поэтому точность ограничена
 
   end subroutine translate_M2L_correct
 
@@ -369,35 +369,35 @@ contains
   ! Fx = -dφ/dx = -Σ n · L_nm · (x-xc)^(nn-1) · (y-yc)^m
   ! Fy = -dφ/dy = -Σ m · L_nm · (x-xc)^n · (y-yc)^(mm-1)
   !============================================================================
-  subroutine eval_local(cell, xs, ys, phi, fx, fy)
-    type(Cell), intent(in) :: cell
+  subroutine eval_local(grid_cell, xs, ys, phi, fx, fy)
+    type(Cell), intent(in) :: grid_cell
     real(dp), intent(in) :: xs(:), ys(:)
     real(dp), intent(inout) :: phi(:), fx(:), fy(:)
 
-    integer :: i, ip, n, m
+    integer :: i, ip, nn, mm
     real(dp) :: dx, dy
 
-    do i = 1, cell%np
-      ip = cell%ids(i)
+    do i = 1, grid_cell%np
+      ip = grid_cell%ids(i)
 
-      dx = xs(ip) - cell%xc
-      dy = ys(ip) - cell%yc
+      dx = xs(ip) - grid_cell%xc
+      dy = ys(ip) - grid_cell%yc
 
       ! Вычисляем φ, F из L
       do nn = 0, P_ORDER
         do mm = 0, P_ORDER - nn
-          if (abs(cell%L(nn,mm)) < 1e-15_dp) cycle
+          if (abs(grid_cell%L(nn,mm)) < 1e-15_dp) cycle
 
           ! Потенциал
-          phi(ip) = phi(ip) + cell%L(nn,mm) * dx**nn * dy**mm
+          phi(ip) = phi(ip) + grid_cell%L(nn,mm) * dx**nn * dy**mm
 
           ! Силы
-          if (n > 0) then
-            fx(ip) = fx(ip) - real(nn,dp) * cell%L(nn,mm) * dx**(nn-1) * dy**mm
+          if (nn > 0) then
+            fx(ip) = fx(ip) - real(nn,dp) * grid_cell%L(nn,mm) * dx**(nn-1) * dy**mm
           end if
 
-          if (m > 0) then
-            fy(ip) = fy(ip) - real(mm,dp) * cell%L(nn,mm) * dx**nn * dy**(mm-1)
+          if (mm > 0) then
+            fy(ip) = fy(ip) - real(mm,dp) * grid_cell%L(nn,mm) * dx**nn * dy**(mm-1)
           end if
         end do
       end do
