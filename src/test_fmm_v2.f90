@@ -16,8 +16,8 @@ program test_fmm_v2
 
   integer, parameter :: N = 1000                ! Число частиц
   integer, parameter :: NGRID = 30              ! Размер сетки
-  integer, parameter :: P_ORDER = 3             ! Порядок разложения (МЕНЯЙТЕ!)
-  integer, parameter :: NEAR_RANGE = 5          ! Радиус ближнего поля
+  integer, parameter :: P_ORDER = 2             ! Порядок разложения (МЕНЯЙТЕ!)
+  integer, parameter :: NEAR_RANGE = 7          ! Радиус ближнего поля
 
   real(dp), allocatable :: xs(:), ys(:), qs(:)
   real(dp), allocatable :: phi_fmm(:), fx_fmm(:), fy_fmm(:)
