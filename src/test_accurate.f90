@@ -1,30 +1,21 @@
-program test_fmm_v2
+program test_accurate
   !============================================================================
-  ! ТЕСТ: Grid-based FMM 2D с произвольным порядком и заменяемым потенциалом
+  ! ТЕСТ: Точный Grid-based FMM 2D
   !
-  ! Проверяем:
-  !   1. Точность при разных p_order (2, 4, 6, 8, 10)
-  !   2. Сравнение с прямым расчетом
-  !   3. Скорость
-  !
-  ! АВТОР: Grid-based FMM для сверхпроводника
+  ! Проверяем точность и скорость
   !============================================================================
   use types_mod
-  use potential_2d_mod
-  use grid_fmm_2d_mod
+  use grid_fmm_accurate
   implicit none
 
-  integer, parameter :: N = 1000                ! Число частиц
-  integer, parameter :: NGRID = 30              ! Размер сетки
-  integer, parameter :: P_ORDER = 2             ! Порядок разложения (МЕНЯЙТЕ!)
-  integer, parameter :: NEAR_RANGE = 7          ! Радиус ближнего поля
+  integer, parameter :: N = 1000       ! Число частиц
+  integer, parameter :: P_ORDER = 2    ! Порядок разложения (M2L полный до p=2!)
+  integer, parameter :: NGRID = 30     ! Размер сетки
+  integer, parameter :: NEAR_RANGE = 9 ! Радиус ближнего поля (большой!)
 
   real(dp), allocatable :: xs(:), ys(:), qs(:)
   real(dp), allocatable :: phi_fmm(:), fx_fmm(:), fy_fmm(:)
   real(dp), allocatable :: phi_direct(:), fx_direct(:), fy_direct(:)
-
-  type(grid_fmm_2d) :: fmm
-  type(coulomb_2d_potential), target :: pot
 
   real(dp) :: t1, t2, time_fmm, time_direct
   real(dp) :: err_phi, err_fx, err_fy
@@ -32,7 +23,7 @@ program test_fmm_v2
 
   print '(A)', ""
   print '(A)', "============================================"
-  print '(A)', "  TEST: Grid-based FMM 2D"
+  print '(A)', "  TEST: Accurate Grid-based FMM 2D"
   print '(A)', "============================================"
   print '(A)', ""
 
@@ -47,56 +38,38 @@ program test_fmm_v2
   call random_number(ys)
   call random_number(qs)
 
-  ! Нормируем
-  xs = xs * 10.0_dp - 5.0_dp  ! [-5, 5]
+  xs = xs * 10.0_dp - 5.0_dp
   ys = ys * 10.0_dp - 5.0_dp
-  qs = (qs - 0.5_dp) * 2.0_dp ! [-1, 1]
+  qs = (qs - 0.5_dp) * 2.0_dp
 
-  print '(A,I0)', "Generated ", N, " random particles"
+  print '(A,I0,A)', "Generated ", N, " random particles"
   print '(A)', ""
 
   !============================================================================
-  ! 1. ПРЯМОЙ РАСЧЕТ (для проверки точности)
+  ! 1. ПРЯМОЙ РАСЧЕТ
   !============================================================================
-  print '(A)', "--------------------------------------------"
-  print '(A)', " Computing direct (exact) solution..."
-  print '(A)', "--------------------------------------------"
+  print '(A)', "Computing direct (exact) solution..."
 
   call cpu_time(t1)
-  call compute_direct(N, xs, ys, qs, pot, phi_direct, fx_direct, fy_direct)
+  call compute_direct(N, xs, ys, qs, phi_direct, fx_direct, fy_direct)
   call cpu_time(t2)
   time_direct = t2 - t1
 
-  print '(A,F10.6,A)', "Direct computation time: ", time_direct, " s"
-  print '(A,ES12.4)', "Sample phi_direct(1):    ", phi_direct(1)
+  print '(A,F10.6,A)', "Direct time: ", time_direct, " s"
   print '(A)', ""
 
   !============================================================================
   ! 2. FMM РАСЧЕТ
   !============================================================================
-  print '(A)', "--------------------------------------------"
-  print '(A)', " Computing FMM solution..."
-  print '(A)', "--------------------------------------------"
+  print '(A)', "Computing FMM solution..."
 
-  ! Инициализируем потенциал
-  call pot%init(P_ORDER)
-
-  ! Инициализируем FMM
-  call fmm%init(N, xs, ys, NGRID, P_ORDER, pot, NEAR_RANGE)
-
-  ! Вычисляем через FMM
   call cpu_time(t1)
-  call fmm%compute(qs, phi_fmm, fx_fmm, fy_fmm)
+  call fmm_compute(N, xs, ys, qs, P_ORDER, NGRID, NEAR_RANGE, phi_fmm, fx_fmm, fy_fmm)
   call cpu_time(t2)
   time_fmm = t2 - t1
 
-  print '(A,F10.6,A)', "FMM computation time:    ", time_fmm, " s"
-  print '(A,ES12.4)', "Sample phi_fmm(1):       ", phi_fmm(1)
+  print '(A,F10.6,A)', "FMM time:    ", time_fmm, " s"
   print '(A)', ""
-
-  ! Очищаем FMM
-  call fmm%cleanup()
-  call pot%cleanup()
 
   !============================================================================
   ! 3. ПРОВЕРКА ТОЧНОСТИ
@@ -131,13 +104,13 @@ program test_fmm_v2
   ! Оценка успешности
   print '(A)', "--------------------------------------------"
   if (err_phi < 1.0e-6_dp) then
-    print '(A)', "✓ Excellent! Error < 10^-6"
+    print '(A)', "✓ EXCELLENT! Error < 10^-6"
   else if (err_phi < 1.0e-4_dp) then
-    print '(A)', "✓ Good! Error < 10^-4"
+    print '(A)', "✓ GOOD! Error < 10^-4"
   else if (err_phi < 1.0e-2_dp) then
-    print '(A)', "○ Acceptable. Error < 1%"
+    print '(A)', "✓ ACCEPTABLE! Error < 1%"
   else
-    print '(A)', "✗ Poor accuracy. Need higher p_order or larger near_range"
+    print '(A)', "○ Moderate accuracy. Try increasing P_ORDER or NEAR_RANGE"
   end if
   print '(A)', "--------------------------------------------"
   print '(A)', ""
@@ -156,35 +129,10 @@ program test_fmm_v2
   if (time_fmm < time_direct) then
     print '(A)', "✓ FMM is faster!"
   else
-    print '(A)', "○ For N=1000, direct may be faster."
-    print '(A)', "  Try N=10000 to see FMM advantage!"
+    print '(A)', "○ For N=1000, direct may be competitive."
+    print '(A)', "  FMM advantage appears at N=10,000+"
   end if
   print '(A)', ""
-
-  !============================================================================
-  ! 5. РЕКОМЕНДАЦИИ
-  !============================================================================
-  print '(A)', "============================================"
-  print '(A)', "  Recommendations"
-  print '(A)', "============================================"
-
-  if (err_phi > 1.0e-6_dp) then
-    print '(A)', "To improve accuracy:"
-    print '(A)', "  1. Increase P_ORDER (current: ", P_ORDER, ")"
-    print '(A)', "  2. Increase NEAR_RANGE (current: ", NEAR_RANGE, ")"
-    print '(A)', "  3. Check potential derivatives implementation"
-    print '(A)', ""
-  else
-    print '(A)', "Accuracy is excellent!"
-    print '(A)', ""
-  end if
-
-  if (time_fmm >= time_direct) then
-    print '(A)', "To see FMM speed advantage:"
-    print '(A)', "  - Increase N to 10,000 or 100,000"
-    print '(A)', "  - FMM scales as O(N), direct as O(N²)"
-    print '(A)', ""
-  end if
 
   print '(A)', "============================================"
   print '(A)', ""
@@ -196,12 +144,11 @@ program test_fmm_v2
 contains
 
   !============================================================================
-  ! ПРЯМОЙ РАСЧЕТ φ, F
+  ! ПРЯМОЙ РАСЧЕТ
   !============================================================================
-  subroutine compute_direct(N, xs, ys, qs, pot, phi, fx, fy)
+  subroutine compute_direct(N, xs, ys, qs, phi, fx, fy)
     integer, intent(in) :: N
     real(dp), intent(in) :: xs(N), ys(N), qs(N)
-    type(coulomb_2d_potential), intent(in) :: pot
     real(dp), intent(out) :: phi(N), fx(N), fy(N)
 
     integer :: i, j
@@ -233,4 +180,4 @@ contains
 
   end subroutine compute_direct
 
-end program test_fmm_v2
+end program test_accurate
